@@ -12,13 +12,127 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  //directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id        String   @id @default(uuid())
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password      String   // bcrypt hashed password
+  displayName   String
+  phone         String?
+  refreshToken  String?  // JWT refresh token
+  isEmailVerified Boolean @default(false)
+  emailVerificationToken String?
+  passwordResetToken String?
+  passwordResetExpires DateTime?
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+  role          RoleName?
+
+  @@index([email])
+  @@index([refreshToken])
+}
+
+model Business {
+  id            String   @id @default(uuid())
+  displayName   String   // Company name
+  email         String   @unique
+  password      String   // bcrypt hashed password
+  CVR           String   @unique // Changed from Int to String - CVR can have letters
+  refreshToken  String?  // JWT refresh token
+  isEmailVerified Boolean @default(false)
+  emailVerificationToken String?
+  passwordResetToken String?
+  passwordResetExpires DateTime?
+  lastLoginAt   DateTime?
+  salons        Salon[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+  role          RoleName?
+
+  @@index([email])
+  @@index([refreshToken])
+}
+
+enum RoleName {
+  BUSINESS
+  ADMIN
+  USER
+}
+
+model Salon {
+  salonId     Int         @id @default(autoincrement())
+  salonName   String     
+  business    Business    @relation(fields: [businessId], references: [id])
+  businessId  String     
+  salonType   SalonType   @relation(fields: [salonTypeId], references: [id])
+  salonTypeId Int
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
+  services    SalonService[]
+  address     String?
+  city        String?
+  zipCode     String?
+  country     String?
+  phone       String? 
+  deals       Deal[]
+
+  @@index([businessId])
+  @@index([salonTypeId])
+  @@index([createdAt])
+}
+
+
+model SalonType {
+  id     Int     @id @default(autoincrement())
+  name   String  @unique
+  salons Salon[]
+}
+
+model Service {
+  id     Int     @id @default(autoincrement())
+  name   String  @unique
+  salons SalonService[]
+}
+
+model SalonService {
+  id        Int     @id @default(autoincrement())
+  salon     Salon   @relation(fields: [salonId], references: [salonId]) // Changed to match Salon.salonId
+  salonId   Int
+  service   Service @relation(fields: [serviceId], references: [id])
+  serviceId Int
+
+  @@unique([salonId, serviceId])
+}
+
+model Deal {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  originalPrice Decimal
+  price       Decimal  
+  quantity    Int
+  startDate   DateTime
+  expiryDate  DateTime
+  salon       Salon    @relation(fields: [salonId], references: [salonId]) // Changed to match Salon.salonId
+  salonId     Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  durationMinutes Int
+  imageUrl    String? // URL or path to deal image
+  @@index([salonId])
+  @@index([startDate])
+  @@index([expiryDate])
+  @@index([createdAt])
+}
+
+model WaitingList {
+  id        Int      @id @default(autoincrement())
   email     String   @unique
-  password  String
-  name      String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }

@@ -4,7 +4,15 @@ import cors from "cors";
 
 const app = express();
 
-app.use(cors());
+// Update CORS configuration
+app.use(
+  cors({
+    origin: "http://localhost:9090", // Frontend URL
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

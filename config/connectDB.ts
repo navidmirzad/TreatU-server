@@ -1,11 +1,14 @@
 import dotenv from 'dotenv'
 import { createClient } from '@supabase/supabase-js'
+import { PrismaClient } from "../generated/prisma";
 
-dotenv.config()
+const prisma = new PrismaClient()
+
+dotenv.config();
 
 const supabaseUrl = process.env.SUPABASE_URL ?? ''
-//const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''; 
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY ?? ''
-const supabase = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { 'Authorization': `Bearer ${supabaseAnonKey}` } } })
+const supabaseKey = process.env.SUPABASE_ANON_KEY ?? ''
+// const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
+const supabase = createClient(supabaseUrl, supabaseKey)
 
-export default supabase;
+export { supabase, prisma };
