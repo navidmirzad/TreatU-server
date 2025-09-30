@@ -21,6 +21,7 @@ model User {
   password      String   // bcrypt hashed password
   displayName   String
   phone         String?
+  accessToken      String?
   refreshToken  String?  // JWT refresh token
   isEmailVerified Boolean @default(false)
   emailVerificationToken String?
@@ -42,6 +43,7 @@ model Business {
   email         String   @unique
   password      String   // bcrypt hashed password
   CVR           String   @unique // Changed from Int to String - CVR can have letters
+  accessToken      String?
   refreshToken  String?  // JWT refresh token
   isEmailVerified Boolean @default(false)
   emailVerificationToken String?
