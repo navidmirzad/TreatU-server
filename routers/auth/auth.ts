@@ -54,6 +54,15 @@ router.post("/register", async (req: Request, res: Response) => {
       },
     });
 
+    // Generate tokens for the newly created user
+    const { accessToken, refreshToken } = generateTokens(user.id);
+
+    // Store tokens on user record
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { accessToken, refreshToken },
+    });
+
     res.status(201).json({
       message: "Registration successful",
       user: {
@@ -63,6 +72,9 @@ router.post("/register", async (req: Request, res: Response) => {
         phone: user.phone,
         role: user.role,
       },
+      role: user.role,
+      access_token: accessToken,
+      refresh_token: refreshToken,
     });
   } catch (error: any) {
     console.error("Registration error:", error);
@@ -111,6 +123,7 @@ router.post("/login", async (req: Request, res: Response) => {
         displayName: user.displayName,
         role: user.role,
       },
+      role: user.role,
       access_token: accessToken,
       refresh_token: refreshToken,
     });

@@ -8,7 +8,7 @@ const app = express();
 // Update CORS configuration
 app.use(
   cors({
-    origin: "http://localhost:9090", // Frontend URL
+    origin: ["http://localhost:9090", "http://localhost:3000"], // Frontend URLs
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Accept"],
@@ -24,6 +24,9 @@ app.get("/", (req: Request, res: Response) => {
 
 import authRouter from "./routers/auth/auth";
 app.use("/auth", authRouter);
+
+import salonRouter from "./routers/salon/salon";
+app.use("/salon", salonRouter);
 
 const PORT = process.env.BACKEND_PORT;
 app.listen(PORT, () => {
