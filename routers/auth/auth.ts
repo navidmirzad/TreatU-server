@@ -1,11 +1,11 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { PrismaClient, RoleName } from "../../generated/prisma";
+import { RoleName } from "../../generated/prisma";
 import { verifyToken, AuthRequest } from "../../middleware/authMiddleware";
+import { prisma } from "../../config/connectDB";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Generate tokens
 const generateTokens = (userId: string) => {
@@ -27,7 +27,7 @@ const generateTokens = (userId: string) => {
 // REGISTER
 router.post("/register", async (req: Request, res: Response) => {
   try {
-    const { email, password, displayName, phone, roleName } = req.body;
+    const { email, password, displayName, phone, roleName, CVR, address, city, zipCode, country } = req.body;
 
     if (!email || !password || !displayName || !roleName) {
       return res.status(400).json({ error: "Missing required fields" });
@@ -37,9 +37,19 @@ router.post("/register", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Invalid role name" });
     }
 
+    // Check if email already exists in User table
     const existingUser = await prisma.user.findUnique({ where: { email } });
+    
     if (existingUser) {
       return res.status(400).json({ error: "Email already registered" });
+    }
+
+    // Check if CVR already exists (if provided)
+    if (CVR) {
+      const existingCVR = await prisma.user.findFirst({ where: { CVR } });
+      if (existingCVR) {
+        return res.status(400).json({ error: "CVR already registered" });
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -51,13 +61,18 @@ router.post("/register", async (req: Request, res: Response) => {
         displayName,
         phone: phone || null,
         role: roleName,
+        // Business/freelancer optional fields
+        CVR: CVR || null,
+        address: address || null,
+        city: city || null,
+        zipCode: zipCode || null,
+        country: country || null,
       },
     });
 
-    // Generate tokens for the newly created user
-    const { accessToken, refreshToken } = generateTokens(user.id);
+      // Generate tokens for the newly created user
+      const { accessToken, refreshToken } = generateTokens(user.id);
 
-    // Store tokens on user record
     await prisma.user.update({
       where: { id: user.id },
       data: { accessToken, refreshToken },
@@ -71,6 +86,11 @@ router.post("/register", async (req: Request, res: Response) => {
         displayName: user.displayName,
         phone: user.phone,
         role: user.role,
+        CVR: user.CVR,
+        address: user.address,
+        city: user.city,
+        zipCode: user.zipCode,
+        country: user.country,
       },
       role: user.role,
       access_token: accessToken,
@@ -136,68 +156,229 @@ router.post("/login", async (req: Request, res: Response) => {
   }
 });
 
-/* // REFRESH
-router.post("/refresh", verifyToken, async (req: AuthRequest, res: Response) => {
+// Get user profile
+router.get("/profile", verifyToken, async (req: AuthRequest, res: Response) => {
   try {
-    const { refresh_token } = req.body;
-    const userId = req.user?.userId; // Get userId from verified token
-
-    if (!refresh_token || !userId) {
-      return res.status(401).json({ error: "Invalid request" });
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Find user and verify stored token matches
     const user = await prisma.user.findUnique({
       where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        phone: true,
+        role: true,
+        CVR: true,
+        address: true,
+        city: true,
+        zipCode: true,
+        country: true,
+        isEmailVerified: true,
+        createdAt: true,
+        lastLoginAt: true,
+      },
     });
 
-    if (!user || user.refreshToken !== refresh_token) {
-      return res.status(401).json({ error: "Invalid refresh token" });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
     }
 
-    // Generate new tokens
-    const tokens = generateTokens(user.id);
-
-    // Update stored tokens
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { 
-        refreshToken: tokens.refreshToken,
-        accessToken: tokens.accessToken 
-      },
-    });
-
-    res.json({
-      access_token: tokens.accessToken,
-      refresh_token: tokens.refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-      },
-    });
-  } catch (error) {
-    res.status(401).json({ error: "Invalid or expired refresh token" });
+    res.json({ user });
+  } catch (error: any) {
+    console.error("Profile fetch error:", error);
+    res.status(500).json({ error: "Error fetching profile", details: error.message });
   }
 });
 
-// LOGOUT
-router.post("/logout", async (req: Request, res: Response) => {
+// Update user profile
+router.put("/profile", verifyToken, async (req: AuthRequest, res: Response) => {
   try {
-    const { refresh_token } = req.body; // Client must send refresh token
-
-    if (refresh_token) {
-      await prisma.user.updateMany({
-        where: { refreshToken: refresh_token },
-        data: { refreshToken: null, accessToken: null },
-      });
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    res.json({ message: "Logged out successfully" });
-  } catch (error) {
-    res.status(500).json({ error: "Error during logout" });
+    const { displayName, phone, CVR, address, city, zipCode, country } = req.body;
+
+    // Validate input
+    if (!displayName || displayName.trim().length === 0) {
+      return res.status(400).json({ error: "Display name is required" });
+    }
+
+    // Check if CVR already exists (if provided and different from current)
+    if (CVR) {
+      const existingCVR = await prisma.user.findFirst({ 
+        where: { 
+          CVR: CVR.trim(),
+          NOT: { id: userId }
+        } 
+      });
+      if (existingCVR) {
+        return res.status(400).json({ error: "CVR already registered by another user" });
+      }
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        displayName: displayName.trim(),
+        phone: phone?.trim() || null,
+        CVR: CVR?.trim() || null,
+        address: address?.trim() || null,
+        city: city?.trim() || null,
+        zipCode: zipCode?.trim() || null,
+        country: country?.trim() || null,
+      },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        phone: true,
+        role: true,
+        CVR: true,
+        address: true,
+        city: true,
+        zipCode: true,
+        country: true,
+        isEmailVerified: true,
+        createdAt: true,
+        lastLoginAt: true,
+      },
+    });
+
+    res.json({ 
+      message: "Profile updated successfully",
+      user: updatedUser 
+    });
+  } catch (error: any) {
+    console.error("Profile update error:", error);
+    res.status(500).json({ error: "Error updating profile", details: error.message });
   }
-}); */
+});
+
+// Get user profile with business details (for business users)
+router.get("/business/profile", verifyToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        phone: true,
+        CVR: true,
+        address: true,
+        city: true,
+        zipCode: true,
+        country: true,
+        role: true,
+        isEmailVerified: true,
+        createdAt: true,
+        lastLoginAt: true,
+        salons: {
+          select: {
+            salonId: true,
+            salonName: true,
+            address: true,
+            city: true,
+            zipCode: true,
+            country: true,
+            phone: true,
+            salonType: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ user });
+  } catch (error: any) {
+    console.error("Business profile fetch error:", error);
+    res.status(500).json({ error: "Error fetching business profile", details: error.message });
+  }
+});
+
+// Update business profile (same as regular profile now)
+router.put("/business/profile", verifyToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { displayName, CVR, address, city, zipCode, country, phone } = req.body;
+
+    // Validate input
+    if (!displayName || displayName.trim().length === 0) {
+      return res.status(400).json({ error: "Business name is required" });
+    }
+
+    // Check if CVR already exists (if provided and different from current)
+    if (CVR) {
+      const existingCVR = await prisma.user.findFirst({ 
+        where: { 
+          CVR: CVR.trim(),
+          NOT: { id: userId }
+        } 
+      });
+      if (existingCVR) {
+        return res.status(400).json({ error: "CVR already registered by another user" });
+      }
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        displayName: displayName.trim(),
+        CVR: CVR?.trim() || null,
+        address: address?.trim() || null,
+        city: city?.trim() || null,
+        zipCode: zipCode?.trim() || null,
+        country: country?.trim() || null,
+        phone: phone?.trim() || null,
+      },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        phone: true,
+        CVR: true,
+        address: true,
+        city: true,
+        zipCode: true,
+        country: true,
+        role: true,
+        isEmailVerified: true,
+        createdAt: true,
+        lastLoginAt: true,
+      },
+    });
+
+    res.json({ 
+      message: "Business profile updated successfully",
+      user: updatedUser 
+    });
+  } catch (error: any) {
+    console.error("Business profile update error:", error);
+    res.status(500).json({ error: "Error updating business profile", details: error.message });
+  }
+});
 
 // Example of protecting other routes
 router.get("/protected-route", verifyToken, (req: AuthRequest, res: Response) => {

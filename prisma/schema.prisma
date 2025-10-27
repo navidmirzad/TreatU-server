@@ -28,6 +28,16 @@ model User {
   passwordResetToken String?
   passwordResetExpires DateTime?
   lastLoginAt   DateTime?
+  
+  // Business-related fields (optional for freelancers)
+  CVR           String?   // Business registration number - optional for freelancers
+  address       String?   // Business/freelancer address - optional
+  city          String?   // City - optional
+  zipCode       String?   // Zip code - optional
+  country       String?   // Country - optional
+  
+  salons        Salon[]   // Relationship to salons (for businesses/freelancers with locations)
+  
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   deletedAt     DateTime?
@@ -35,30 +45,10 @@ model User {
 
   @@index([email])
   @@index([refreshToken])
+  @@index([CVR])
 }
 
-model Business {
-  id            String   @id @default(uuid())
-  displayName   String   // Company name
-  email         String   @unique
-  password      String   // bcrypt hashed password
-  CVR           String   @unique // Changed from Int to String - CVR can have letters
-  accessToken      String?
-  refreshToken  String?  // JWT refresh token
-  isEmailVerified Boolean @default(false)
-  emailVerificationToken String?
-  passwordResetToken String?
-  passwordResetExpires DateTime?
-  lastLoginAt   DateTime?
-  salons        Salon[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  deletedAt     DateTime?
-  role          RoleName?
 
-  @@index([email])
-  @@index([refreshToken])
-}
 
 enum RoleName {
   BUSINESS
@@ -69,8 +59,8 @@ enum RoleName {
 model Salon {
   salonId     Int         @id @default(autoincrement())
   salonName   String     
-  business    Business    @relation(fields: [businessId], references: [id])
-  businessId  String     
+  user        User        @relation(fields: [userId], references: [id])
+  userId      String     
   salonType   SalonType   @relation(fields: [salonTypeId], references: [id])
   salonTypeId Int
   createdAt   DateTime    @default(now())
@@ -84,7 +74,7 @@ model Salon {
   phone       String? 
   deals       Deal[]
 
-  @@index([businessId])
+  @@index([userId])
   @@index([salonTypeId])
   @@index([createdAt])
 }
