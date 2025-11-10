@@ -28,7 +28,7 @@ app.use("/auth", authRouter);
 import salonRouter from "./routers/salon/salon";
 app.use("/salon", salonRouter);
 
-const PORT = process.env.BACKEND_PORT || 8081;
+const PORT = process.env.BACKEND_PORT || 8080;
 app.listen(PORT, () => {
   console.log("Server is running on PORT:", PORT);
 });
