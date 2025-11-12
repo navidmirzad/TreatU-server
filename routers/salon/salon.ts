@@ -42,12 +42,12 @@ router.post("/create", verifyToken, async (req: Request, res: Response) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Create Salon associated with the user (no need for separate business table)
+    // Create Salon associated with the user
     const salon = await prisma.salon.create({
       data: {
         salonName,
         salonTypeId: salonTypeRecord.id,
-        userId, // Direct reference to user
+        userId,
         address: address || null,
         city: city || null,
         zipCode: zipCode || null,
@@ -56,19 +56,52 @@ router.post("/create", verifyToken, async (req: Request, res: Response) => {
       },
     });
 
-    // Create Service entries if necessary and link via SalonService
-    if (Array.isArray(services)) {
-      for (const svcName of services) {
-        let svc = await prisma.service.findUnique({ where: { name: svcName } });
-        if (!svc) {
-          svc = await prisma.service.create({ data: { name: svcName } });
+    // Handle services if provided
+    if (Array.isArray(services) && services.length > 0) {
+      for (const serviceName of services) {
+        if (serviceName && typeof serviceName === 'string') {
+          // Find existing service or create if it doesn't exist
+          let service = await prisma.service.findUnique({ where: { name: serviceName } });
+          if (!service) {
+            // Create service with the salon type as category
+            service = await prisma.service.create({ 
+              data: { 
+                name: serviceName,
+                category: salonType 
+              } 
+            });
+          }
+          
+          // Create junction record (avoid duplicates)
+          try {
+            await prisma.salonService.create({ 
+              data: { 
+                salonId: salon.salonId, 
+                serviceId: service.id 
+              } 
+            });
+          } catch (error) {
+            // Ignore duplicate key errors
+            console.log(`Service ${serviceName} already linked to salon ${salon.salonId}`);
+          }
         }
-        // Create junction record
-        await prisma.salonService.create({ data: { salonId: salon.salonId, serviceId: svc.id } }).catch(() => {});
       }
     }
 
-    res.json({ message: "Salon created", salon });
+    // Fetch the complete salon data with relations
+    const completeSalon = await prisma.salon.findUnique({
+      where: { salonId: salon.salonId },
+      include: {
+        salonType: true,
+        services: {
+          include: {
+            service: true
+          }
+        }
+      }
+    });
+
+    res.json({ message: "Salon created successfully", salon: completeSalon });
   } catch (err: any) {
     console.error('Salon create error:', err);
     res.status(500).json({ error: "Error creating salon", details: err?.message || String(err) });
@@ -83,7 +116,7 @@ router.put("/:salonId", verifyToken, async (req: Request, res: Response) => {
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const { salonId } = req.params;
-    const { salonName, salonType, address, city, zipCode, country, phone } = req.body;
+    const { salonName, salonType, services, address, city, zipCode, country, phone } = req.body;
 
     if (!salonName || !salonType) {
       return res.status(400).json({ error: "Missing salonName or salonType" });
@@ -107,7 +140,7 @@ router.put("/:salonId", verifyToken, async (req: Request, res: Response) => {
       salonTypeRecord = await prisma.salonType.create({ data: { name: salonType } });
     }
 
-    // Update salon
+    // Update salon basic information
     const updatedSalon = await prisma.salon.update({
       where: { salonId: parseInt(salonId) },
       data: {
@@ -122,7 +155,57 @@ router.put("/:salonId", verifyToken, async (req: Request, res: Response) => {
       }
     });
 
-    res.json({ message: "Salon updated", salon: updatedSalon });
+    // Handle services update if provided
+    if (Array.isArray(services)) {
+      // Remove all existing salon-service relationships
+      await prisma.salonService.deleteMany({
+        where: { salonId: parseInt(salonId) }
+      });
+
+      // Add new services
+      for (const serviceName of services) {
+        if (serviceName && typeof serviceName === 'string') {
+          // Find existing service or create if it doesn't exist
+          let service = await prisma.service.findUnique({ where: { name: serviceName } });
+          if (!service) {
+            // Create service with the salon type as category
+            service = await prisma.service.create({ 
+              data: { 
+                name: serviceName,
+                category: salonType 
+              } 
+            });
+          }
+          
+          // Create new junction record
+          try {
+            await prisma.salonService.create({ 
+              data: { 
+                salonId: parseInt(salonId), 
+                serviceId: service.id 
+              } 
+            });
+          } catch (error) {
+            console.log(`Failed to link service ${serviceName} to salon ${salonId}`);
+          }
+        }
+      }
+    }
+
+    // Fetch the complete updated salon data with relations
+    const completeSalon = await prisma.salon.findUnique({
+      where: { salonId: parseInt(salonId) },
+      include: {
+        salonType: true,
+        services: {
+          include: {
+            service: true
+          }
+        }
+      }
+    });
+
+    res.json({ message: "Salon updated successfully", salon: completeSalon });
   } catch (err: any) {
     console.error('Salon update error:', err);
     res.status(500).json({ error: "Error updating salon", details: err?.message || String(err) });
@@ -195,6 +278,27 @@ router.get("/", verifyToken, async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('Get salons error:', err);
     res.status(500).json({ error: "Error fetching salons", details: err?.message || String(err) });
+  }
+});
+
+// GET /services - get services, optionally filtered by salon type
+router.get("/services", verifyToken, async (req: Request, res: Response) => {
+  try {
+    const { salonType } = req.query;
+
+    const services = await prisma.service.findMany({
+      where: salonType ? { 
+        category: salonType as string 
+      } : {},
+      orderBy: {
+        name: 'asc'
+      }
+    });
+
+    res.json({ services });
+  } catch (err: any) {
+    console.error('Get services error:', err);
+    res.status(500).json({ error: "Error fetching services", details: err?.message || String(err) });
   }
 });
 

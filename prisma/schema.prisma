@@ -87,9 +87,12 @@ model SalonType {
 }
 
 model Service {
-  id     Int     @id @default(autoincrement())
-  name   String  @unique
-  salons SalonService[]
+  id       Int            @id @default(autoincrement())
+  name     String         @unique
+  category String         // Maps to SalonType.name for filtering
+  salons   SalonService[]
+  
+  @@index([category])
 }
 
 model SalonService {
