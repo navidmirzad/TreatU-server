@@ -25,6 +25,9 @@ app.get("/", (req: Request, res: Response) => {
 import authRouter from "./routers/auth/auth";
 app.use("/auth", authRouter);
 
+import profileRouter from "./routers/profile/profile";
+app.use("/profile", profileRouter);
+
 import salonRouter from "./routers/salon/salon";
 app.use("/salon", salonRouter);
 

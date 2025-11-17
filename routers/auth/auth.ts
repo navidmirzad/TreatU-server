@@ -1,9 +1,10 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+
 import { RoleName } from "../../generated/prisma";
 import { verifyToken, AuthRequest } from "../../middleware/authMiddleware";
-import { prisma } from "../../config/connectDB";
+import { prisma, supabase } from "../../config/connectDB";
 
 const router = Router();
 
@@ -171,6 +172,7 @@ router.get("/profile", verifyToken, async (req: AuthRequest, res: Response) => {
         email: true,
         displayName: true,
         phone: true,
+        profilePicture: true,
         role: true,
         CVR: true,
         address: true,
@@ -238,6 +240,7 @@ router.put("/profile", verifyToken, async (req: AuthRequest, res: Response) => {
         email: true,
         displayName: true,
         phone: true,
+        profilePicture: true,
         role: true,
         CVR: true,
         address: true,
@@ -257,126 +260,6 @@ router.put("/profile", verifyToken, async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error("Profile update error:", error);
     res.status(500).json({ error: "Error updating profile", details: error.message });
-  }
-});
-
-// Get user profile with business details (for business users)
-router.get("/business/profile", verifyToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.user?.userId;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-        phone: true,
-        CVR: true,
-        address: true,
-        city: true,
-        zipCode: true,
-        country: true,
-        role: true,
-        isEmailVerified: true,
-        createdAt: true,
-        lastLoginAt: true,
-        salons: {
-          select: {
-            salonId: true,
-            salonName: true,
-            address: true,
-            city: true,
-            zipCode: true,
-            country: true,
-            phone: true,
-            salonType: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    res.json({ user });
-  } catch (error: any) {
-    console.error("Business profile fetch error:", error);
-    res.status(500).json({ error: "Error fetching business profile", details: error.message });
-  }
-});
-
-// Update business profile (same as regular profile now)
-router.put("/business/profile", verifyToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.user?.userId;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const { displayName, CVR, address, city, zipCode, country, phone } = req.body;
-
-    // Validate input
-    if (!displayName || displayName.trim().length === 0) {
-      return res.status(400).json({ error: "Business name is required" });
-    }
-
-    // Check if CVR already exists (if provided and different from current)
-    if (CVR) {
-      const existingCVR = await prisma.user.findFirst({ 
-        where: { 
-          CVR: CVR.trim(),
-          NOT: { id: userId }
-        } 
-      });
-      if (existingCVR) {
-        return res.status(400).json({ error: "CVR already registered by another user" });
-      }
-    }
-
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        displayName: displayName.trim(),
-        CVR: CVR?.trim() || null,
-        address: address?.trim() || null,
-        city: city?.trim() || null,
-        zipCode: zipCode?.trim() || null,
-        country: country?.trim() || null,
-        phone: phone?.trim() || null,
-      },
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-        phone: true,
-        CVR: true,
-        address: true,
-        city: true,
-        zipCode: true,
-        country: true,
-        role: true,
-        isEmailVerified: true,
-        createdAt: true,
-        lastLoginAt: true,
-      },
-    });
-
-    res.json({ 
-      message: "Business profile updated successfully",
-      user: updatedUser 
-    });
-  } catch (error: any) {
-    console.error("Business profile update error:", error);
-    res.status(500).json({ error: "Error updating business profile", details: error.message });
   }
 });
 

@@ -189,3 +189,6 @@ sketch
 /generated/prisma
 
 /generated/prisma
+
+# Prisma schema - contains sensitive database info
+prisma/schema.prisma
