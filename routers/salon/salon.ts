@@ -4,9 +4,11 @@ import { prisma } from "../../config/connectDB";
 
 const router = Router();
 
+/**
+ * Fetches all salon types from the database
+ */
 router.get("/salon-types", verifyToken, async (req: Request, res: Response) => {
   try {
-    // Fetch all salon types from the database
     const salonTypes = await prisma.salonType.findMany({
       orderBy: {
         name: 'asc'
@@ -20,7 +22,9 @@ router.get("/salon-types", verifyToken, async (req: Request, res: Response) => {
   }
 });
 
-// POST /create - create a salon and its services
+/**
+ * POST /create - create a salon and its services
+ */
 router.post("/create", verifyToken, async (req: Request, res: Response) => {
   try {
     const authReq = req as AuthRequest;
@@ -108,7 +112,9 @@ router.post("/create", verifyToken, async (req: Request, res: Response) => {
   }
 });
 
-// PUT /salon/:salonId - update a salon
+/**
+ * PUT /salon/:salonId - update a salon
+ */
 router.put("/:salonId", verifyToken, async (req: Request, res: Response) => {
   try {
     const authReq = req as AuthRequest;
@@ -212,7 +218,9 @@ router.put("/:salonId", verifyToken, async (req: Request, res: Response) => {
   }
 });
 
-// DELETE /salon/:salonId - delete a salon (soft delete)
+/**
+ * DELETE /salon/:salonId - delete a salon (soft delete)
+ */
 router.delete("/:salonId", verifyToken, async (req: Request, res: Response) => {
   try {
     const authReq = req as AuthRequest;
@@ -249,7 +257,9 @@ router.delete("/:salonId", verifyToken, async (req: Request, res: Response) => {
   }
 });
 
-// GET /salon - get all salons for a user
+/**
+ * GET /salon - get all salons for a user
+ */
 router.get("/", verifyToken, async (req: Request, res: Response) => {
   try {
     const authReq = req as AuthRequest;
@@ -281,7 +291,9 @@ router.get("/", verifyToken, async (req: Request, res: Response) => {
   }
 });
 
-// GET /services - get services, optionally filtered by salon type
+/**
+ * GET /services - get services, optionally filtered by salon type
+ */
 router.get("/services", verifyToken, async (req: Request, res: Response) => {
   try {
     const { salonType } = req.query;
@@ -302,7 +314,9 @@ router.get("/services", verifyToken, async (req: Request, res: Response) => {
   }
 });
 
-// GET /all - public: get all salons (visible to freelancers)
+/**
+ * GET /all - public: get all salons (visible to freelancers) 
+ */
 router.get("/all", async (req: Request, res: Response) => {
   try {
     const salons = await prisma.salon.findMany({

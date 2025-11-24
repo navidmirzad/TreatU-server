@@ -65,17 +65,3 @@ export const verifyToken = (
   }
 };
 
-// Optional: Role-based authorization middleware
-/* export const requireRoles = (allowedRoles: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.user?.role) {
-      return res.status(403).json({ error: 'User role not found' });
-    }
-
-    if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
-
-    next();
-  };
-}; */
