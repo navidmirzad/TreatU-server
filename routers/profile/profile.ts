@@ -47,9 +47,15 @@ router.get("/profile", verifyToken, async (req: AuthRequest, res: Response) => {
         city: true,
         zipCode: true,
         country: true,
-        isEmailVerified: true,
+          isEmailVerified: true,
         createdAt: true,
         lastLoginAt: true,
+          // include services provided by the user (if any)
+          userServices: {
+            select: {
+              service: true
+            }
+          }
       },
     });
 
@@ -72,7 +78,7 @@ router.put("/profile", verifyToken, async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { displayName, phone, CVR, address, city, zipCode, country } = req.body;
+    const { displayName, phone, CVR, address, city, zipCode, country, services } = req.body;
 
     // Validate input
     if (!displayName || displayName.trim().length === 0) {
@@ -121,9 +127,58 @@ router.put("/profile", verifyToken, async (req: AuthRequest, res: Response) => {
       },
     });
 
+    // If services array provided, update UserService join table
+    if (Array.isArray(services)) {
+      // Remove existing links
+      await prisma.userService.deleteMany({ where: { userId } });
+
+      // Create new links (ensure service exists)
+      for (const svc of services) {
+        if (typeof svc === 'string' || typeof svc === 'number') {
+          // Try to find matching service by name or id
+          let serviceRecord = null as any;
+          if (typeof svc === 'number') {
+            serviceRecord = await prisma.service.findUnique({ where: { id: svc } });
+          } else {
+            serviceRecord = await prisma.service.findUnique({ where: { name: svc } });
+          }
+
+          if (serviceRecord) {
+            try {
+              await prisma.userService.create({ data: { userId, serviceId: serviceRecord.id } });
+            } catch (e) {
+              // ignore duplicates / errors
+            }
+          }
+        }
+      }
+    }
+
+    // Fetch updated user including services
+    const userWithServices = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        phone: true,
+        profilePicture: true,
+        role: true,
+        CVR: true,
+        address: true,
+        city: true,
+        zipCode: true,
+        country: true,
+        isEmailVerified: true,
+        createdAt: true,
+        lastLoginAt: true,
+        userServices: { select: { service: true } }
+      }
+    });
+
     res.json({ 
       message: "Profile updated successfully",
-      user: updatedUser 
+      user: userWithServices 
     });
   } catch (error: any) {
     console.error("Profile update error:", error);

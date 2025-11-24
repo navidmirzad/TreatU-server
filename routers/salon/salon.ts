@@ -302,4 +302,29 @@ router.get("/services", verifyToken, async (req: Request, res: Response) => {
   }
 });
 
+// GET /all - public: get all salons (visible to freelancers)
+router.get("/all", async (req: Request, res: Response) => {
+  try {
+    const salons = await prisma.salon.findMany({
+      where: { deletedAt: null },
+      include: {
+        salonType: true,
+        services: {
+          include: {
+            service: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.json({ salons });
+  } catch (err: any) {
+    console.error('Get all salons error:', err);
+    res.status(500).json({ error: "Error fetching salons", details: err?.message || String(err) });
+  }
+});
+
 export default router;
