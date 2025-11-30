@@ -454,4 +454,60 @@ router.post('/:salonId/images', verifyToken, upload.array('images', 6), async (r
   }
 });
 
+/**
+ * GET /:salonId/jobs - public: get job listings for a salon
+ */
+router.get('/:salonId/jobs', async (req: Request, res: Response) => {
+  try {
+    const { salonId } = req.params;
+    const id = parseInt(salonId);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid salonId' });
+
+    const jobs = await prisma.job.findMany({
+      where: { salonId: id },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({ jobs });
+  } catch (err: any) {
+    console.error('Get salon jobs error:', err);
+    res.status(500).json({ error: 'Error fetching jobs', details: err?.message || String(err) });
+  }
+});
+
+/**
+ * POST /:salonId/jobs - create a job listing for a salon (authenticated, salon owner)
+ */
+router.post('/:salonId/jobs', verifyToken, async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthRequest;
+    const userId = authReq.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { salonId } = req.params;
+    const id = parseInt(salonId);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid salonId' });
+
+    const { title, description, salary } = req.body;
+    if (!title || typeof title !== 'string') return res.status(400).json({ error: 'Title is required' });
+
+    // Verify salon belongs to user
+    const salon = await prisma.salon.findUnique({ where: { salonId: id } });
+    if (!salon || salon.deletedAt) return res.status(404).json({ error: 'Salon not found' });
+    if (salon.userId !== userId) return res.status(403).json({ error: 'Forbidden: not salon owner' });
+
+    const job = await prisma.job.create({ data: {
+      title,
+      description: description || null,
+      salary: salary || null,
+      salonId: id
+    }});
+
+    res.status(201).json({ job });
+  } catch (err: any) {
+    console.error('Create salon job error:', err);
+    res.status(500).json({ error: 'Error creating job', details: err?.message || String(err) });
+  }
+});
+
 export default router;
