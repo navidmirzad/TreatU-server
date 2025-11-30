@@ -1,8 +1,20 @@
 import { Router, Request, Response } from "express";
+import multer from "multer";
 import { verifyToken, AuthRequest } from "../../middleware/authMiddleware";
-import { prisma } from "../../config/connectDB";
+import { prisma, supabase } from "../../config/connectDB";
 
 const router = Router();
+
+// Configure multer for memory storage for image uploads
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8MB per file
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files are allowed'));
+  }
+});
 
 /**
  * Fetches all salon types from the database
@@ -96,13 +108,14 @@ router.post("/create", verifyToken, async (req: Request, res: Response) => {
     const completeSalon = await prisma.salon.findUnique({
       where: { salonId: salon.salonId },
       include: {
-        salonType: true,
-        services: {
-          include: {
-            service: true
-          }
+          salonType: true,
+          services: {
+            include: {
+              service: true
+            }
+          },
+          images: true
         }
-      }
     });
 
     res.json({ message: "Salon created successfully", salon: completeSalon });
@@ -207,7 +220,8 @@ router.put("/:salonId", verifyToken, async (req: Request, res: Response) => {
           include: {
             service: true
           }
-        }
+        },
+        images: true
       }
     });
 
@@ -278,6 +292,8 @@ router.get("/", verifyToken, async (req: Request, res: Response) => {
             service: true
           }
         }
+        ,
+        images: true
       },
       orderBy: {
         createdAt: 'desc'
@@ -328,6 +344,8 @@ router.get("/all", async (req: Request, res: Response) => {
             service: true
           }
         }
+        ,
+        images: true
       },
       orderBy: {
         createdAt: 'desc'
@@ -357,6 +375,7 @@ router.get("/:salonId/full", async (req: Request, res: Response) => {
         services: {
           include: { service: true }
         },
+        images: true,
         deals: true,
         user: {
           select: {
@@ -370,6 +389,59 @@ router.get("/:salonId/full", async (req: Request, res: Response) => {
         }
       }
     });
+
+/**
+ * POST /:salonId/images - upload images for a salon (authenticated)
+ * Accepts multipart/form-data with field name 'images' (multiple allowed)
+ */
+router.post('/:salonId/images', verifyToken, upload.array('images', 6), async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthRequest;
+    const userId = authReq.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { salonId } = req.params;
+    const files = req.files as Express.Multer.File[] | undefined;
+    if (!files || files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
+
+    // Verify salon belongs to user
+    const existingSalon = await prisma.salon.findFirst({ where: { salonId: parseInt(salonId), userId, deletedAt: null } });
+    if (!existingSalon) return res.status(404).json({ error: 'Salon not found or unauthorized' });
+
+    const uploaded: { id: number; url: string; fileName?: string }[] = [];
+
+    for (const file of files) {
+      const fileExt = (file.originalname || '').split('.').pop() || 'jpg';
+      const fileName = `${existingSalon.salonId}-${Date.now()}-${Math.random().toString(36).substring(2,8)}.${fileExt}`;
+      const filePath = `salon-images/${existingSalon.salonId}/${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from('SalonImages')
+        .upload(filePath, file.buffer, { contentType: file.mimetype, upsert: false });
+
+      if (error) {
+        console.error('Supabase upload error:', error);
+        continue;
+      }
+
+      // Get public URL
+      const { data: publicData } = supabase.storage.from('SalonImages').getPublicUrl(filePath);
+      const publicUrl = publicData.publicUrl;
+
+      // Persist record in DB
+      const img = await prisma.salonImage.create({ data: { salonId: existingSalon.salonId, url: publicUrl, fileName } });
+      uploaded.push({ id: img.id, url: img.url, fileName: img.fileName || undefined });
+    }
+
+    // Return updated salon with images
+    const completeSalon = await prisma.salon.findUnique({ where: { salonId: existingSalon.salonId }, include: { images: true, salonType: true, services: { include: { service: true } } } });
+
+    res.json({ message: 'Images uploaded', uploaded, salon: completeSalon });
+  } catch (err: any) {
+    console.error('Upload salon images error:', err);
+    res.status(500).json({ error: 'Error uploading images', details: err?.message || String(err) });
+  }
+});
 
     if (!salon || salon.deletedAt) {
       return res.status(404).json({ error: "Salon not found" });
