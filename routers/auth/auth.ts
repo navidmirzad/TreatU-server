@@ -109,7 +109,7 @@ router.post("/register", async (req: Request, res: Response) => {
 // LOGIN
 router.post("/login", async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
@@ -124,19 +124,32 @@ router.post("/login", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Invalid email or password" });
     }
 
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(
-      user.id,
-    );
+    // Generate tokens depending on rememberMe
+    let accessToken: string;
+    let refreshToken: string | null = null;
 
-    // Store refresh token in DB
+    if (rememberMe) {
+      const tokens = generateTokens(user.id);
+      accessToken = tokens.accessToken;
+      refreshToken = tokens.refreshToken;
+    } else {
+      accessToken = jwt.sign(
+        { userId: user.id },
+        process.env.JWT_SECRET || "default_jwt_secret",
+        { expiresIn: "60m" }
+      );
+      // ensure no lingering refresh token in DB
+      refreshToken = null;
+    }
+
+    // Update tokens in DB: always update accessToken, set refreshToken only when generated (or null to clear)
     await prisma.user.update({
       where: { id: user.id },
-      data: { refreshToken, accessToken },
+      data: { accessToken, refreshToken },
     });
 
-    // Return tokens in response
-    res.status(200).json({
+    // Build response
+    const responseBody: any = {
       message: "Login successful",
       user: {
         id: user.id,
@@ -146,8 +159,10 @@ router.post("/login", async (req: Request, res: Response) => {
       },
       role: user.role,
       access_token: accessToken,
-      refresh_token: refreshToken,
-    });
+    };
+    if (rememberMe && refreshToken) responseBody.refresh_token = refreshToken;
+
+    res.status(200).json(responseBody);
   } catch (error: any) {
     console.error("Login error:", error);
     res.status(500).json({
@@ -268,4 +283,31 @@ router.get("/protected-route", verifyToken, (req: AuthRequest, res: Response) =>
   res.json({ message: "This is a protected route", user: req.user });
 });
 
+// LOGOUT - clear tokens in DB and clear cookies
+router.post("/logout", verifyToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { refreshToken: null, accessToken: null },
+    });
+
+    // Clear cookies if frontend stored tokens in cookies
+    try {
+      res.clearCookie("refresh_token");
+      res.clearCookie("access_token");
+    } catch (e) {
+      // ignore cookie clear errors
+    }
+
+    res.json({ message: "Logged out successfully" });
+  } catch (error: any) {
+    console.error("Logout error:", error);
+    res.status(500).json({ error: "Logout failed", details: error.message });
+  }
+});
 export default router;
