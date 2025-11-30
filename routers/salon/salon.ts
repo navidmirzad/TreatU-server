@@ -341,4 +341,45 @@ router.get("/all", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /:salonId/full - public: get a single salon with full details
+ */
+router.get("/:salonId/full", async (req: Request, res: Response) => {
+  try {
+    const { salonId } = req.params;
+    const id = parseInt(salonId);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid salonId" });
+
+    const salon = await prisma.salon.findUnique({
+      where: { salonId: id },
+      include: {
+        salonType: true,
+        services: {
+          include: { service: true }
+        },
+        deals: true,
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            profilePicture: true,
+            phone: true,
+            email: true,
+            role: true
+          }
+        }
+      }
+    });
+
+    if (!salon || salon.deletedAt) {
+      return res.status(404).json({ error: "Salon not found" });
+    }
+
+    res.json({ salon });
+  } catch (err: any) {
+    console.error('Get full salon error:', err);
+    res.status(500).json({ error: "Error fetching salon", details: err?.message || String(err) });
+  }
+});
+
 export default router;
