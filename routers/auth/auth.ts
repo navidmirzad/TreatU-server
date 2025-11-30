@@ -13,7 +13,7 @@ const generateTokens = (userId: string) => {
   const accessToken = jwt.sign(
     { userId },
     process.env.JWT_SECRET || "default_jwt_secret",
-    { expiresIn: "60m" }
+    { expiresIn: "8h" }
   );
 
   const refreshToken = jwt.sign(
@@ -136,7 +136,7 @@ router.post("/login", async (req: Request, res: Response) => {
       accessToken = jwt.sign(
         { userId: user.id },
         process.env.JWT_SECRET || "default_jwt_secret",
-        { expiresIn: "60m" }
+        { expiresIn: "8h" }
       );
       // ensure no lingering refresh token in DB
       refreshToken = null;
