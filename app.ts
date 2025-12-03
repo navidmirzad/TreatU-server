@@ -31,6 +31,9 @@ app.use("/profile", profileRouter);
 import salonRouter from "./routers/salon/salon";
 app.use("/salon", salonRouter);
 
+import jobRouter from "./routers/job/job";
+app.use("/job", jobRouter);
+
 const PORT = process.env.BACKEND_PORT || 8080;
 app.listen(PORT, () => {
   console.log("Server is running on PORT:", PORT);
