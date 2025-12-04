@@ -71,4 +71,43 @@ router.get('/:jobId/applications', verifyToken, async (req: Request, res: Respon
   }
 });
 
+/**
+ * DELETE /job/:jobId - delete a job listing (owner only)
+ */
+router.delete("/:jobId", verifyToken, async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthRequest;
+    const userId = authReq.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { jobId } = req.params;
+    const id = parseInt(jobId);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid jobId' });
+
+    // Verify job exists and that current user owns the salon for this job
+    const job = await prisma.job.findUnique({ 
+      where: { id }, 
+      include: { salon: true } 
+    });
+    
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    if (job.salon.userId !== userId) return res.status(403).json({ error: 'Forbidden - you can only delete your own job listings' });
+
+    // Delete all applications for this job first (cascade delete)
+    await prisma.application.deleteMany({
+      where: { jobId: id }
+    });
+
+    // Delete the job
+    await prisma.job.delete({
+      where: { id }
+    });
+
+    res.json({ message: 'Job listing deleted successfully' });
+  } catch (err: any) {
+    console.error('Delete job error:', err);
+    res.status(500).json({ error: 'Error deleting job', details: err?.message || String(err) });
+  }
+});
+
 export default router;
