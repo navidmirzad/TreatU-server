@@ -8,7 +8,7 @@
     "dev:tsx": "tsx watch --clear-screen=false app.ts",
     "dev:verbose": "tsx watch --clear-screen=false --inspect app.ts",
     "build": "tsc && node ./scripts/copy-generated.cjs",
-    "postinstall": "npm run build",
+    "postinstall": "npm run prisma:generate && npm run build",
     "start": "node dist/app.js",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
