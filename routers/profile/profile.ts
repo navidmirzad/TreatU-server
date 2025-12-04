@@ -408,6 +408,42 @@ router.delete("/picture", verifyToken, async (req: AuthRequest, res: Response) =
   }
 });
 
+// Get user applications
+router.get("/applications", verifyToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const applications = await prisma.application.findMany({
+      where: { applicantId: userId },
+      include: {
+        job: {
+          include: {
+            salon: {
+              select: {
+                salonId: true,
+                salonName: true,
+                address: true,
+                city: true,
+                zipCode: true,
+                country: true,
+              }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({ applications });
+  } catch (error: any) {
+    console.error("Applications fetch error:", error);
+    res.status(500).json({ error: "Error fetching applications", details: error.message });
+  }
+});
+
 // Example of protecting other routes
 router.get("/protected-route", verifyToken, (req: AuthRequest, res: Response) => {
   res.json({ message: "This is a protected route", user: req.user });
