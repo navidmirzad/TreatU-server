@@ -22,19 +22,19 @@ app.get("/", (req: Request, res: Response) => {
   res.json({ status: "OK", timestamp: new Date().toISOString() });
 });
 
-import authRouter from "./routers/auth/auth";
+import authRouter from "./routers/auth/auth.js";
 app.use("/auth", authRouter);
 
-import profileRouter from "./routers/profile/profile";
+import profileRouter from "./routers/profile/profile.js";
 app.use("/profile", profileRouter);
 
-import salonRouter from "./routers/salon/salon";
+import salonRouter from "./routers/salon/salon.js";
 app.use("/salon", salonRouter);
 
-import jobRouter from "./routers/job/job";
+import jobRouter from "./routers/job/job.js";
 app.use("/job", jobRouter);
 
-import contactRouter from "./routers/contact/contact";
+import contactRouter from "./routers/contact/contact.js";
 app.use("/contact", contactRouter);
 
 const PORT = process.env.BACKEND_PORT || 8080;

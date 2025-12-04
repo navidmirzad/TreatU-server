@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { verifyToken, AuthRequest } from '../../middleware/authMiddleware';
-import { prisma } from '../../config/connectDB';
+import { verifyToken, AuthRequest } from '../../middleware/authMiddleware.js';
+import { prisma } from '../../config/connectDB.js';
 
 const router = Router();
 

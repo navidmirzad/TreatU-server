@@ -2,9 +2,9 @@ import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import multer from "multer";
-import { RoleName } from "../../generated/prisma";
-import { verifyToken, AuthRequest } from "../../middleware/authMiddleware";
-import { prisma, supabase } from "../../config/connectDB";
+import { RoleName } from "../../generated/prisma/index.js";
+import { verifyToken, AuthRequest } from "../../middleware/authMiddleware.js";
+import { prisma, supabase } from "../../config/connectDB.js";
 
 const router = Router();
 

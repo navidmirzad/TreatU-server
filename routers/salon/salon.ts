@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
-import { verifyToken, AuthRequest } from "../../middleware/authMiddleware";
-import { prisma, supabase } from "../../config/connectDB";
+import { verifyToken, AuthRequest } from "../../middleware/authMiddleware.js";
+import { prisma, supabase } from "../../config/connectDB.js";
 
 const router = Router();
 
