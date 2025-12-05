@@ -8,7 +8,13 @@ const app = express();
 // Update CORS configuration
 app.use(
   cors({
-    origin: ["http://localhost:9090", "http://localhost:3000"], // Frontend URLs
+    origin: (origin, callback) => {
+      const allowed = [process.env.FRONTEND_URL, "http://localhost:9090", "http://localhost:3000"].filter(Boolean) as string[];
+      // Allow requests with no origin (non-browser clients, e.g. curl, mobile)
+      if (!origin) return callback(null, true);
+      if (allowed.includes(origin)) return callback(null, true);
+      return callback(new Error("CORS origin not allowed"));
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Accept"],
@@ -40,4 +46,5 @@ app.use("/contact", contactRouter);
 const PORT = process.env.BACKEND_PORT || 8080;
 app.listen(PORT, () => {
   console.log("Server is running on PORT:", PORT);
+  console.log("CORS allowed frontend origin:", process.env.FRONTEND_URL ?? "(none)");
 });
