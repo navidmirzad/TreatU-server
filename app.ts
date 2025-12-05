@@ -43,6 +43,9 @@ app.use("/job", jobRouter);
 import contactRouter from "./routers/contact/contact.js";
 app.use("/contact", contactRouter);
 
+import healthRouter from "./routers/health/health.js";
+app.use("/health", healthRouter);
+
 const PORT = process.env.BACKEND_PORT || 8080;
 app.listen(PORT, () => {
   console.log("Server is running on PORT:", PORT);
